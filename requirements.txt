@@ -1,0 +1,28 @@
+# ── Web Framework ──────────────────────────────────────
+fastapi                  # Backend web framework
+uvicorn                  # Server that runs FastAPI
+python-multipart         # Handles file uploads in FastAPI
+
+# ── Document Processing ────────────────────────────────
+pypdf                    # Reads PDF files and extracts text
+
+# ── Vector Store ───────────────────────────────────────
+chromadb                 # Local vector database to store embeddings
+
+# ── Embeddings (converts text → numbers for search) ───
+sentence-transformers    # Free, local embedding model
+
+# ── Keyword Search (for Hybrid RAG) ───────────────────
+rank-bm25                # BM25 keyword search algorithm
+
+# ── LLM APIs ──────────────────────────────────────────
+google-generativeai      # Gemini API (primary LLM)
+groq                     # Groq API (fallback LLM)
+langchain-groq           # Groq wrapper for RAGAS evaluation
+
+# ── Evaluation ─────────────────────────────────────────
+ragas                    # Scores our RAG pipeline outputs
+datasets                 # Required by ragas internally
+
+# ── Utilities ──────────────────────────────────────────
+python-dotenv            # Reads API keys from .env file

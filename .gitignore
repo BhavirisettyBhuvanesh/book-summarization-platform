@@ -1,0 +1,21 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+
+# Backend Secrets & Database
+backend/.env
+backend/rag_app.db
+
+# Data & Uploads
+data/
+backend/data/
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+
+# OS Files
+.DS_Store
+Thumbs.db
