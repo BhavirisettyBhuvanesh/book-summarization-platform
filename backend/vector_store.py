@@ -53,7 +53,7 @@ def _store(doc_id: str, items: List[Dict], collection_type: str):
     # Generate embeddings using Gemini (batch process if needed, though the API accepts lists)
     # text-embedding-004 allows batches. We can just send the whole list.
     response = client.models.embed_content(
-        model="text-embedding-004",
+        model="gemini-embedding-2",
         contents=texts,
     )
     
@@ -61,8 +61,8 @@ def _store(doc_id: str, items: List[Dict], collection_type: str):
     embeddings_list = [emb.values for emb in response.embeddings]
     embeddings = np.array(embeddings_list).astype('float32')
     
-    # Create FAISS index (Gemini text-embedding-004 uses 768 dimensions)
-    dimension = 768 
+    # Create FAISS index (gemini-embedding-2 uses 3072 dimensions)
+    dimension = 3072 
     index = faiss.IndexFlatL2(dimension)
     index.add(embeddings)
     
@@ -87,7 +87,7 @@ def search(doc_id: str, query: str, collection_type: str = "chunks", top_k: int 
     
     # Generate embedding for the query
     response = client.models.embed_content(
-        model="text-embedding-004",
+        model="gemini-embedding-2",
         contents=query,
     )
     query_embedding = np.array([response.embeddings[0].values]).astype('float32')
