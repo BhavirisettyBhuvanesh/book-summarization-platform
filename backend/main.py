@@ -80,11 +80,11 @@ async def startup_event():
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login")
 
-# CORS Setup - must use explicit origins (not "*") when allow_credentials=True
+# CORS Setup - Allow all origins so Vercel can connect
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
-    allow_credentials=True,
+    allow_origins=["*"],
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
