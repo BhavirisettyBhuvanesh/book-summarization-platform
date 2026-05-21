@@ -185,15 +185,13 @@ def process_and_store_background(file_path: str, filename: str, doc_id: str):
         store_chunks(doc_id, doc_data["chunks"])
         store_pages(doc_id, doc_data["pages"])
 
-        # Save document metadata to our JSON file
+        # Update document metadata in our JSON file
         docs = load_metadata()
-        docs.append({
-            "doc_id":       doc_id,
-            "filename":     filename,
-            "total_pages":  doc_data["total_pages"],
-            "total_chunks": doc_data["total_chunks"],
-            "file_path":    file_path
-        })
+        for d in docs:
+            if d["doc_id"] == doc_id:
+                d["total_pages"] = doc_data["total_pages"]
+                d["total_chunks"] = doc_data["total_chunks"]
+                break
         save_metadata(docs)
         print(f"[Background] Finished processing for: {filename}")
     except Exception as e:
@@ -221,6 +219,17 @@ async def upload_document(
     save_path = UPLOAD_DIR / f"{doc_id}_{file.filename}"
     with open(save_path, "wb") as f:
         shutil.copyfileobj(file.file, f)
+
+    # Immediately add a 'Processing' state to the database
+    docs = load_metadata()
+    docs.append({
+        "doc_id":       doc_id,
+        "filename":     file.filename,
+        "total_pages":  "Processing...",
+        "total_chunks": "Processing...",
+        "file_path":    str(save_path)
+    })
+    save_metadata(docs)
 
     # Queue the heavy embedding work in the background!
     background_tasks.add_task(process_and_store_background, str(save_path), file.filename, doc_id)
@@ -288,6 +297,24 @@ async def query_document(
     doc = next((d for d in docs if d["doc_id"] == doc_id), None)
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found.")
+
+    if doc.get("total_pages") == "Processing...":
+        return {
+            "comparison": [
+                {
+                    "pipeline_name": "Basic RAG",
+                    "answer": "This document is still being processed in the background (reading pages and generating embeddings). Please wait a few more minutes before asking questions!"
+                },
+                {
+                    "pipeline_name": "Page Indexing RAG",
+                    "answer": "Processing..."
+                },
+                {
+                    "pipeline_name": "Hybrid RAG",
+                    "answer": "Processing..."
+                }
+            ]
+        }
 
     print(f"\n[Query] Question: {question} (User: {current_user.email})")
     
