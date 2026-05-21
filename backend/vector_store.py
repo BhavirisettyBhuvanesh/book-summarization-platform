@@ -23,7 +23,10 @@ def preload_model():
     global _model
     if _model is None:
         print("[VectorStore] Loading embedding model (this takes a moment)...", flush=True)
-        _model = SentenceTransformer("all-MiniLM-L6-v2", device="cpu")
+        # Load the sentence transformer model for generating embeddings
+        # We now load it from the local folder to bypass HuggingFace's Render IP blocks
+        model_path = os.path.join(os.path.dirname(__file__), "local_model")
+        _model = SentenceTransformer(model_path, device="cpu")
         print("[VectorStore] Model ready.", flush=True)
 
 def _get_model():
