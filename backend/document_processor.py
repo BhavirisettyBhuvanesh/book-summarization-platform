@@ -12,6 +12,12 @@ def extract_text_by_pages(pdf_path: str) -> List[Dict]:
     pages = []
 
     for i, page in enumerate(doc):
+        # FREE TIER PROTECTION: Limit to first 15 pages to prevent exceeding 
+        # Gemini's strict 30,000 Tokens-Per-Minute quota on free accounts.
+        if i >= 15:
+            print("[Info] Stopping at page 15 to stay within Gemini Free Tier limits.")
+            break
+            
         text = page.get_text()    # extract raw text from this page
 
         # Some pages might be images (scanned PDFs) and have no text
