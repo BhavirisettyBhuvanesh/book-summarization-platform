@@ -59,7 +59,7 @@ def _store(doc_id: str, items: List[Dict], collection_type: str):
     
     model = _get_model()
     texts = [item["content"] for item in items]
-    embeddings = model.encode(texts, convert_to_numpy=True).astype('float32')
+    embeddings = model.encode(texts,batch_size=4,convert_to_numpy=True).astype('float32')
     
     # Create FAISS index
     dimension = embeddings.shape[1]
