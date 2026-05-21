@@ -1,39 +1,27 @@
 import os
 import json
-
-# Force offline mode BEFORE importing sentence_transformers
-os.environ["TRANSFORMERS_OFFLINE"] = "1"
-os.environ["HF_DATASETS_OFFLINE"] = "1"
-
 import numpy as np
 import faiss
 from typing import List, Dict
-from sentence_transformers import SentenceTransformer
+from google import genai
 
 # ── File paths ─────────────────────────────────────────────────────────────────
 BASE_DIR = os.path.dirname(os.path.dirname(__file__))
 DATA_DIR = os.path.join(BASE_DIR, "data", "faiss_store")
 os.makedirs(DATA_DIR, exist_ok=True)
 
-# ── Global Model (Loaded on demand) ───────────────────────────────────────────
-_model = None
+# ── Gemini Client Setup ───────────────────────────────────────────────────────
+# We use the existing GEMINI_API_KEY from the environment
+_client = None
 
-def preload_model():
-    """Call this during FastAPI startup to ensure the model is loaded before requests."""
-    global _model
-    if _model is None:
-        print("[VectorStore] Loading embedding model (this takes a moment)...", flush=True)
-        # Load the sentence transformer model for generating embeddings
-        # We now load it from the local folder to bypass HuggingFace's Render IP blocks
-        model_path = os.path.join(os.path.dirname(__file__), "local_model")
-        _model = SentenceTransformer(model_path, device="cpu")
-        print("[VectorStore] Model ready.", flush=True)
-
-def _get_model():
-    global _model
-    if _model is None:
-        preload_model()
-    return _model
+def get_client():
+    global _client
+    if _client is None:
+        api_key = os.getenv("GEMINI_API_KEY")
+        if not api_key:
+            raise ValueError("GEMINI_API_KEY is not set in environment variables")
+        _client = genai.Client(api_key=api_key)
+    return _client
 
 # ── Helper: Save/Load Index and Metadata ──────────────────────────────────────
 def _get_paths(doc_id: str, collection_type: str):
@@ -47,22 +35,34 @@ def _get_paths(doc_id: str, collection_type: str):
 # ── Main Functions ────────────────────────────────────────────────────────────
 
 def store_chunks(doc_id: str, chunks: List[Dict]):
-    """Stores chunks using FAISS."""
+    """Stores chunks using FAISS and Gemini."""
     _store(doc_id, chunks, "chunks")
 
 def store_pages(doc_id: str, pages: List[Dict]):
-    """Stores pages using FAISS."""
+    """Stores pages using FAISS and Gemini."""
     _store(doc_id, pages, "pages")
 
 def _store(doc_id: str, items: List[Dict], collection_type: str):
     if not items: return
     
-    model = _get_model()
+    client = get_client()
     texts = [item["content"] for item in items]
-    embeddings = model.encode(texts,batch_size=4,convert_to_numpy=True).astype('float32')
     
-    # Create FAISS index
-    dimension = embeddings.shape[1]
+    print(f"[VectorStore] Generating Gemini embeddings for {len(texts)} {collection_type}...", flush=True)
+    
+    # Generate embeddings using Gemini (batch process if needed, though the API accepts lists)
+    # text-embedding-004 allows batches. We can just send the whole list.
+    response = client.models.embed_content(
+        model="text-embedding-004",
+        contents=texts,
+    )
+    
+    # Extract the embeddings (the API returns a list of embedding objects)
+    embeddings_list = [emb.values for emb in response.embeddings]
+    embeddings = np.array(embeddings_list).astype('float32')
+    
+    # Create FAISS index (Gemini text-embedding-004 uses 768 dimensions)
+    dimension = 768 
     index = faiss.IndexFlatL2(dimension)
     index.add(embeddings)
     
@@ -77,14 +77,20 @@ def _store(doc_id: str, items: List[Dict], collection_type: str):
     print(f"[FAISS] Stored {len(items)} {collection_type} for doc: {doc_id}")
 
 def search(doc_id: str, query: str, collection_type: str = "chunks", top_k: int = 5) -> List[Dict]:
-    """Searches using FAISS."""
+    """Searches using FAISS and Gemini Embeddings."""
     idx_path, meta_path = _get_paths(doc_id, collection_type)
     
     if not os.path.exists(idx_path):
         return []
         
-    model = _get_model()
-    query_embedding = model.encode([query], convert_to_numpy=True).astype('float32')
+    client = get_client()
+    
+    # Generate embedding for the query
+    response = client.models.embed_content(
+        model="text-embedding-004",
+        contents=query,
+    )
+    query_embedding = np.array([response.embeddings[0].values]).astype('float32')
     
     # Load index and metadata
     index = faiss.read_index(idx_path)
@@ -127,3 +133,7 @@ def delete_document(doc_id: str):
         if os.path.exists(folder):
             shutil.rmtree(folder)
     print(f"[FAISS] Deleted data for doc: {doc_id}")
+
+# Provide a dummy preload_model function so main.py doesn't crash when it tries to call it on startup
+def preload_model():
+    print("[VectorStore] No local model to preload. Gemini API will be used on demand.", flush=True)
