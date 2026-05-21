@@ -14,14 +14,14 @@ const Auth = ({ onLoginSuccess }) => {
     setLoading(true);
 
     const endpoint = isLogin ? '/auth/login' : '/auth/register';
-    
+
     // For Login, we use URLSearchParams because OAuth2PasswordRequestForm expects form-data
-    const body = isLogin 
+    const body = isLogin
       ? new URLSearchParams({ username: email, password })
       : new URLSearchParams({ email, password });
 
     try {
-      const response = await fetch(`http://localhost:8001${endpoint}`, {
+      const response = await fetch(`https://book-summarization-platform.onrender.com${endpoint}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',

@@ -13,13 +13,13 @@ export default function QueryInterface({ docId, onQueryResult }) {
 
     setIsQuerying(true);
     setError('');
-    
+
     // Clear the previous results on the screen before starting the new query
     onQueryResult(null);
 
     try {
       const token = localStorage.getItem('token');
-      const response = await axios.post('http://localhost:8001/query', {
+      const response = await axios.post('https://book-summarization-platform.onrender.com/query', {
         doc_id: docId,
         question: question.trim()
       }, {
@@ -27,7 +27,7 @@ export default function QueryInterface({ docId, onQueryResult }) {
           'Authorization': `Bearer ${token}`
         }
       });
-      
+
       onQueryResult(response.data);
     } catch (err) {
       console.error(err);
@@ -40,12 +40,12 @@ export default function QueryInterface({ docId, onQueryResult }) {
   return (
     <div className="glass-panel" style={{ width: '100%', maxWidth: '800px', margin: '0 auto', padding: '1.5rem' }}>
       <form onSubmit={handleSubmit} style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-        
+
         <div style={{ flexGrow: 1, position: 'relative' }}>
-          <Sparkles 
-            size={20} 
-            color="var(--accent-purple)" 
-            style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)' }} 
+          <Sparkles
+            size={20}
+            color="var(--accent-purple)"
+            style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)' }}
           />
           <input
             type="text"
@@ -66,7 +66,7 @@ export default function QueryInterface({ docId, onQueryResult }) {
           />
         </div>
 
-        <button 
+        <button
           type="submit"
           disabled={isQuerying || !question.trim()}
           style={{

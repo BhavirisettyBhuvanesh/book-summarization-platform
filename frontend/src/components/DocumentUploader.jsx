@@ -16,7 +16,7 @@ export default function DocumentUploader({ onUploadSuccess }) {
 
   const handleUpload = async () => {
     if (!file) return;
-    
+
     setStatus('uploading');
     setErrorMessage('');
 
@@ -27,8 +27,8 @@ export default function DocumentUploader({ onUploadSuccess }) {
     try {
       const token = localStorage.getItem('token');
       // Send the file to our FastAPI backend
-      const response = await axios.post('http://localhost:8001/upload', formData, {
-        headers: { 
+      const response = await axios.post('https://book-summarization-platform.onrender.com/upload', formData, {
+        headers: {
           'Content-Type': 'multipart/form-data',
           'Authorization': `Bearer ${token}`
         },
@@ -38,7 +38,7 @@ export default function DocumentUploader({ onUploadSuccess }) {
       setStatus('success');
       // Pass the doc_id back to App.jsx
       onUploadSuccess(response.data.doc_id, file.name);
-      
+
     } catch (error) {
       console.error(error);
       setStatus('error');
@@ -48,9 +48,9 @@ export default function DocumentUploader({ onUploadSuccess }) {
 
   return (
     <div className="glass-panel" style={{ padding: '2rem', textAlign: 'center', width: '100%', maxWidth: '600px', margin: '0 auto' }}>
-      
+
       {/* File Selection Zone */}
-      <div 
+      <div
         style={{
           border: '2px dashed var(--glass-border)',
           borderRadius: '12px',
@@ -62,16 +62,16 @@ export default function DocumentUploader({ onUploadSuccess }) {
         }}
         onClick={() => document.getElementById('file-input').click()}
       >
-        <input 
-          type="file" 
-          id="file-input" 
-          accept=".pdf" 
-          onChange={handleFileSelect} 
-          style={{ display: 'none' }} 
+        <input
+          type="file"
+          id="file-input"
+          accept=".pdf"
+          onChange={handleFileSelect}
+          style={{ display: 'none' }}
         />
-        
+
         <UploadCloud size={48} color={file ? "var(--accent-blue)" : "var(--text-secondary)"} style={{ marginBottom: '1rem' }} />
-        
+
         {file ? (
           <h3 style={{ color: 'var(--text-primary)' }}>Selected: {file.name}</h3>
         ) : (
@@ -86,7 +86,7 @@ export default function DocumentUploader({ onUploadSuccess }) {
 
       {/* Upload Button & Status */}
       {file && status !== 'success' && (
-        <button 
+        <button
           onClick={handleUpload}
           disabled={status === 'uploading'}
           style={{
@@ -107,9 +107,9 @@ export default function DocumentUploader({ onUploadSuccess }) {
           }}
         >
           {status === 'uploading' ? (
-             <><Loader2 className="animate-spin" size={20} /> Processing Document...</>
+            <><Loader2 className="animate-spin" size={20} /> Processing Document...</>
           ) : (
-             'Upload & Analyze'
+            'Upload & Analyze'
           )}
         </button>
       )}
