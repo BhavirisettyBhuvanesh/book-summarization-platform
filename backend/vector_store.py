@@ -1,5 +1,6 @@
 import os
 import json
+import time
 import numpy as np
 import faiss
 from typing import List, Dict
@@ -50,15 +51,37 @@ def _store(doc_id: str, items: List[Dict], collection_type: str):
     
     print(f"[VectorStore] Generating Gemini embeddings for {len(texts)} {collection_type}...", flush=True)
     
-    # Generate embeddings using Gemini (batch process if needed, though the API accepts lists)
-    # text-embedding-004 allows batches. We can just send the whole list.
-    response = client.models.embed_content(
-        model="gemini-embedding-2",
-        contents=texts,
-    )
+    embeddings_list = []
+    batch_size = 20  # Process in small batches
     
-    # Extract the embeddings (the API returns a list of embedding objects)
-    embeddings_list = [emb.values for emb in response.embeddings]
+    for i in range(0, len(texts), batch_size):
+        batch_texts = texts[i:i+batch_size]
+        success = False
+        retries = 0
+        
+        while not success:
+            try:
+                response = client.models.embed_content(
+                    model="gemini-embedding-2",
+                    contents=batch_texts,
+                )
+                embeddings_list.extend([emb.values for emb in response.embeddings])
+                success = True
+                
+                # Small pause to avoid hitting the rapid-fire burst limit
+                time.sleep(1)
+                
+            except Exception as e:
+                # If we hit the 30K TPM limit, pause for 60s and try again
+                if "429" in str(e) or "RESOURCE_EXHAUSTED" in str(e):
+                    if retries > 5:
+                        raise Exception("Rate limit exceeded too many times.")
+                    print(f"[Rate Limit Hit] Sleeping for 60s before continuing (Batch {i}/{len(texts)})...")
+                    time.sleep(60)
+                    retries += 1
+                else:
+                    raise e
+                    
     embeddings = np.array(embeddings_list).astype('float32')
     
     # Create FAISS index (gemini-embedding-2 uses 3072 dimensions)

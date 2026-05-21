@@ -23,7 +23,7 @@ import pipelines.hybrid_rag as hybrid_rag
 print("[Startup] All modules loaded.", flush=True)
 
 # FastAPI imports
-from fastapi import FastAPI, UploadFile, File, HTTPException, Depends, status, Form
+from fastapi import FastAPI, UploadFile, File, HTTPException, Depends, status, Form, BackgroundTasks
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -176,28 +176,10 @@ def save_metadata(docs: list):
     with open(METADATA_FILE, "w") as f:
         json.dump(docs, f, indent=2)
 
-@app.post("/upload")
-async def upload_document(
-    file: UploadFile = File(...),
-    current_user: models.User = Depends(get_current_user)
-):
-
-    # Validate that the uploaded file is a PDF
-    if not file.filename.endswith(".pdf"):
-        raise HTTPException(status_code=400, detail="Only PDF files are supported.")
-
-    # Generate a unique ID for this document (so we can identify it later)
-    doc_id = str(uuid.uuid4())[:8]   # short 8-character unique ID
-
-    # Save the uploaded file to our uploads folder
-    save_path = UPLOAD_DIR / f"{doc_id}_{file.filename}"
-    with open(save_path, "wb") as f:
-        shutil.copyfileobj(file.file, f)   # write file content to disk
-
+def process_and_store_background(file_path: str, filename: str, doc_id: str):
     try:
-        # Process the PDF: extract pages + create overlapping chunks
-        print(f"[Upload] Processing: {file.filename}")
-        doc_data = process_document(str(save_path))
+        print(f"[Background] Starting processing for: {filename}")
+        doc_data = process_document(file_path)
 
         # Store chunks and pages using the new stable FAISS engine
         store_chunks(doc_id, doc_data["chunks"])
@@ -207,29 +189,49 @@ async def upload_document(
         docs = load_metadata()
         docs.append({
             "doc_id":       doc_id,
-            "filename":     file.filename,
+            "filename":     filename,
             "total_pages":  doc_data["total_pages"],
             "total_chunks": doc_data["total_chunks"],
-            "file_path":    str(save_path)
+            "file_path":    file_path
         })
         save_metadata(docs)
-
-        return {
-            "message":      "Document uploaded and processed successfully!",
-            "doc_id":       doc_id,
-            "filename":     file.filename,
-            "total_pages":  doc_data["total_pages"],
-            "total_chunks": doc_data["total_chunks"]
-        }
-
+        print(f"[Background] Finished processing for: {filename}")
     except Exception as e:
-        # If processing fails, delete the saved file so it doesn't clutter the folder
-        print(f"!!! UPLOAD CRASH: {str(e)}")
+        print(f"!!! BACKGROUND CRASH: {str(e)}")
         import traceback
         traceback.print_exc()
-        if save_path.exists():
-            os.remove(save_path)
-        raise HTTPException(status_code=500, detail=f"Failed to process document: {str(e)}")
+        if os.path.exists(file_path):
+            os.remove(file_path)
+
+@app.post("/upload")
+async def upload_document(
+    background_tasks: BackgroundTasks,
+    file: UploadFile = File(...),
+    current_user: models.User = Depends(get_current_user)
+):
+
+    # Validate that the uploaded file is a PDF
+    if not file.filename.endswith(".pdf"):
+        raise HTTPException(status_code=400, detail="Only PDF files are supported.")
+
+    # Generate a unique ID for this document
+    doc_id = str(uuid.uuid4())[:8]
+
+    # Save the uploaded file to our uploads folder
+    save_path = UPLOAD_DIR / f"{doc_id}_{file.filename}"
+    with open(save_path, "wb") as f:
+        shutil.copyfileobj(file.file, f)
+
+    # Queue the heavy embedding work in the background!
+    background_tasks.add_task(process_and_store_background, str(save_path), file.filename, doc_id)
+
+    return {
+        "message":      "Document uploaded and processing in background!",
+        "doc_id":       doc_id,
+        "filename":     file.filename,
+        "total_pages":  "Processing...",
+        "total_chunks": "Processing..."
+    }
 
 
 # ══════════════════════════════════════════════════════════════════════════════
